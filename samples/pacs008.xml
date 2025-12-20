@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <FIToFICstmrCdtTrf>
+
+    <!-- Group Header -->
+    <GrpHdr>
+      <MsgId>RK202512160001</MsgId>
+      <CreDtTm>2025-12-16T09:30:00</CreDtTm>
+      <NbOfTxs>1</NbOfTxs>
+      <SttlmInf>
+        <SttlmMtd>CLRG</SttlmMtd>
+      </SttlmInf>
+    </GrpHdr>
+
+    <!-- Credit Transfer Transaction -->
+    <CdtTrfTxInf>
+
+      <!-- Payment Identification -->
+      <PmtId>
+        <InstrId>INST20251216001</InstrId>
+        <EndToEndId>E2E20251216001</EndToEndId>
+        <TxId>TX20251216001</TxId>
+      </PmtId>
+
+      <!-- Settlement Amount -->
+      <IntrBkSttlmAmt Ccy="INR">1250000.00</IntrBkSttlmAmt>
+      <IntrBkSttlmDt>2025-12-16</IntrBkSttlmDt>
+
+      <!-- Debtor -->
+      <Dbtr>
+        <Nm>ABC Technologies Pvt Ltd</Nm>
+      </Dbtr>
+
+      <!-- Debtor Account -->
+      <DbtrAcct>
+        <Id>
+          <Othr>
+            <Id>123456789012</Id>
+          </Othr>
+        </Id>
+      </DbtrAcct>
+
+      <!-- Debtor Agent -->
+      <DbtrAgt>
+        <FinInstnId>
+          <BICFI>HDFCINBBXXX</BICFI>
+        </FinInstnId>
+      </DbtrAgt>
+
+      <!-- Creditor Agent (RKBank) -->
+      <CdtrAgt>
+        <FinInstnId>
+          <BICFI>RKBKINBBXXX</BICFI>
+        </FinInstnId>
+      </CdtrAgt>
+
+      <!-- Creditor -->
+      <Cdtr>
+        <Nm>XYZ Industries Limited</Nm>
+      </Cdtr>
+
+      <!-- Creditor Account -->
+      <CdtrAcct>
+        <Id>
+          <Othr>
+            <Id>998877665544</Id>
+          </Othr>
+        </Id>
+      </CdtrAcct>
+
+      <!-- Charges -->
+      <ChrgBr>SHAR</ChrgBr>
+
+    </CdtTrfTxInf>
+
+  </FIToFICstmrCdtTrf>
+
+</Document>
