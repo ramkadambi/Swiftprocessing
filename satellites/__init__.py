@@ -3,6 +3,12 @@
 #from .payment_posting import PaymentPostingService
 #from .sanctions_check import SanctionsCheckService
 
-__all__ = ["AccountValidationService", "BalanceCheckService", "PaymentPostingService", "SanctionsCheckService"]
+__all__ = [
+    "AccountValidationService",
+    "BalanceCheckService",
+    "PaymentPostingService",
+    "RoutingValidationService",
+    "SanctionsCheckService",
+]
 
 

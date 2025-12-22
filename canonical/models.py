@@ -37,6 +37,25 @@ class ServiceResultStatus(str, Enum):
     ERROR = "ERROR"
 
 
+class CreditorType(str, Enum):
+    """
+    Creditor account type for clearing/routing decisions.
+    """
+
+    BANK = "BANK"
+    INDIVIDUAL = "INDIVIDUAL"
+
+
+class RoutingNetwork(str, Enum):
+    """
+    Selected payment routing network.
+    """
+
+    FED = "FED"
+    CHIPS = "CHIPS"
+    SWIFT = "SWIFT"
+
+
 @dataclass(frozen=True, slots=True)
 class Agent:
     """
@@ -61,12 +80,29 @@ class Agent:
 
 
 @dataclass(frozen=True, slots=True)
+class AccountValidationEnrichment:
+    """
+    Account validation enrichment data added by the account validation satellite.
+    """
+
+    status: ServiceResultStatus
+    creditor_type: CreditorType
+    fed_member: bool
+    chips_member: bool
+    nostro_with_us: bool
+    vostro_with_us: bool
+    preferred_correspondent: Optional[str]  # BIC
+
+
+@dataclass(frozen=True, slots=True)
 class PaymentEvent:
     """
     Canonical ISO 20022-inspired payment event.
 
     Required fields are intentionally minimal and network-agnostic to support
     multiple payment rails and message sources.
+    
+    Optional enrichment fields may be added by processing satellites.
     """
 
     msg_id: str
@@ -76,6 +112,10 @@ class PaymentEvent:
     debtor_agent: Agent
     creditor_agent: Agent
     status: PaymentStatus
+    account_validation: Optional[AccountValidationEnrichment] = None
+    selected_network: Optional[RoutingNetwork] = None
+    agent_chain: Optional[list[Agent]] = None
+    routing_rule_applied: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.msg_id, str) or not self.msg_id.strip():
@@ -104,6 +144,19 @@ class PaymentEvent:
 
         if not isinstance(self.status, PaymentStatus):
             raise TypeError("status must be a PaymentStatus.")
+
+        if self.account_validation is not None and not isinstance(self.account_validation, AccountValidationEnrichment):
+            raise TypeError("account_validation must be an AccountValidationEnrichment or None.")
+
+        if self.selected_network is not None and not isinstance(self.selected_network, RoutingNetwork):
+            raise TypeError("selected_network must be a RoutingNetwork or None.")
+
+        if self.agent_chain is not None:
+            if not isinstance(self.agent_chain, list):
+                raise TypeError("agent_chain must be a list or None.")
+            for agent in self.agent_chain:
+                if not isinstance(agent, Agent):
+                    raise TypeError("agent_chain must contain only Agent instances.")
 
 
 @dataclass(frozen=True, slots=True)

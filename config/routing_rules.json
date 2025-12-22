@@ -1,0 +1,101 @@
+{
+  "routing_rules": [
+    {
+      "rule_id": "USD_DOMESTIC_FED_DIRECT",
+      "priority": 1,
+      "description": "USD domestic bank-to-bank payments via FED direct",
+      "conditions": {
+        "currency": "USD",
+        "sender_country": "US",
+        "creditor_country": "US",
+        "account_validation": {
+          "creditor_type": "BANK",
+          "fed_member": true
+        }
+      },
+      "actions": {
+        "select_network": "FED",
+        "agent_chain": []
+      }
+    },
+    {
+      "rule_id": "USD_CROSSBORDER_CHIPS_WF",
+      "priority": 2,
+      "description": "USD cross-border high-value payments via CHIPS with Wells Fargo intermediary",
+      "conditions": {
+        "currency": "USD",
+        "amount_threshold": 1000000.00,
+        "account_validation": {
+          "creditor_type": "BANK",
+          "chips_member": true
+        }
+      },
+      "actions": {
+        "select_network": "CHIPS",
+        "insert_intermediary": {
+          "position": "before_creditor",
+          "agent": {
+            "id_scheme": "BIC",
+            "id_value": "WFBIUS6SXXX",
+            "name": "Wells Fargo Bank, N.A."
+          }
+        }
+      }
+    },
+    {
+      "rule_id": "USD_CROSSBORDER_FED_SUBSTITUTE",
+      "priority": 3,
+      "description": "USD cross-border low-value payments via FED with preferred correspondent substitution",
+      "conditions": {
+        "currency": "USD",
+        "amount_threshold_max": 1000000.00,
+        "account_validation": {
+          "creditor_type": "BANK",
+          "fed_member": false,
+          "preferred_correspondent": {
+            "exists": true
+          }
+        }
+      },
+      "actions": {
+        "select_network": "FED",
+        "substitute_intermediary": {
+          "position": "before_creditor",
+          "agent": {
+            "id_scheme": "BIC",
+            "id_value": "${account_validation.preferred_correspondent}",
+            "name": "Preferred Correspondent"
+          }
+        }
+      }
+    },
+    {
+      "rule_id": "USD_INDIVIDUAL_FED",
+      "priority": 4,
+      "description": "USD payments to individual beneficiaries via FED",
+      "conditions": {
+        "currency": "USD",
+        "account_validation": {
+          "creditor_type": "INDIVIDUAL"
+        }
+      },
+      "actions": {
+        "select_network": "FED",
+        "agent_chain": []
+      }
+    },
+    {
+      "rule_id": "USD_FALLBACK_SWIFT",
+      "priority": 99,
+      "description": "USD fallback to SWIFT for all other cases",
+      "conditions": {
+        "currency": "USD"
+      },
+      "actions": {
+        "select_network": "SWIFT",
+        "agent_chain": []
+      }
+    }
+  ]
+}
+

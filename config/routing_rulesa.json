@@ -1,0 +1,112 @@
+{
+    "bank_context": {
+      "bank_name": "Wells Fargo Bank NA",
+      "bank_bic": "WFBIUS6SXXX",
+      "country": "US"
+    },
+  
+    "networks": ["INTERNAL", "FED", "CHIPS", "SWIFT"],
+  
+    "rules": [
+      {
+        "rule_id": "WF-R1-FINAL-CREDIT",
+        "priority": 1,
+        "description": "Wells Fargo is the final beneficiary bank – credit customer internally",
+  
+        "conditions": {
+          "ultimate_creditor_fi_is_self": true
+        },
+  
+        "actions": {
+          "selected_network": "INTERNAL",
+          "agent_action": "NONE"
+        }
+      },
+  
+      {
+        "rule_id": "WF-R2-INTERMEDIARY-FED-DIRECT",
+        "priority": 2,
+        "description": "Wells Fargo acts as intermediary and forwards USD payment to a FED member bank",
+  
+        "conditions": {
+          "ultimate_creditor_fi_is_self": false,
+          "currency": "USD",
+          "next_creditor_fi.fed_member": true
+        },
+  
+        "actions": {
+          "selected_network": "FED",
+          "agent_action": "NONE"
+        }
+      },
+  
+      {
+        "rule_id": "WF-R3-INTERMEDIARY-CHIPS-HIGH-VALUE",
+        "priority": 3,
+        "description": "High-value USD cross-border payment routed via CHIPS with Wells as CHIPS participant",
+  
+        "conditions": {
+          "ultimate_creditor_fi_is_self": false,
+          "currency": "USD",
+          "amount_greater_than": 1000000,
+          "next_creditor_fi.chips_member": true
+        },
+  
+        "actions": {
+          "selected_network": "CHIPS",
+          "agent_action": "USE_SELF_AS_INTERMEDIARY"
+        }
+      },
+  
+      {
+        "rule_id": "WF-R4-INTERMEDIARY-PREFERRED-CORRESPONDENT",
+        "priority": 4,
+        "description": "Next bank is not FED/CHIPS member – use preferred correspondent",
+  
+        "conditions": {
+          "ultimate_creditor_fi_is_self": false,
+          "currency": "USD",
+          "next_creditor_fi.fed_member": false,
+          "next_creditor_fi.chips_member": false,
+          "account_validation.preferred_correspondent_exists": true
+        },
+  
+        "actions": {
+          "selected_network": "FED",
+          "agent_action": "INSERT_PREFERRED_CORRESPONDENT"
+        }
+      },
+  
+      {
+        "rule_id": "WF-R5-INTERMEDIARY-INDIVIDUAL-BENEFICIARY",
+        "priority": 5,
+        "description": "Individual beneficiary – route via FED retail payment",
+  
+        "conditions": {
+          "ultimate_creditor_type": "INDIVIDUAL",
+          "currency": "USD"
+        },
+  
+        "actions": {
+          "selected_network": "FED",
+          "agent_action": "NONE"
+        }
+      },
+  
+      {
+        "rule_id": "WF-R6-FALLBACK-SWIFT",
+        "priority": 99,
+        "description": "Fallback routing via SWIFT when no clearing or correspondent relationship exists",
+  
+        "conditions": {
+          "currency": "USD"
+        },
+  
+        "actions": {
+          "selected_network": "SWIFT",
+          "agent_action": "NONE"
+        }
+      }
+    ]
+  }
+  

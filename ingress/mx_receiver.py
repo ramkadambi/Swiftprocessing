@@ -32,6 +32,27 @@ def _payment_event_to_wire_dict(event: PaymentEvent) -> dict[str, Any]:
     if hasattr(status, "value"):
         d["status"] = status.value
 
+    # Handle optional account_validation enrichment
+    av = d.get("account_validation")
+    if av is not None:
+        if isinstance(av, dict):
+            av_status = av.get("status")
+            if hasattr(av_status, "value"):
+                av["status"] = av_status.value
+            creditor_type = av.get("creditor_type")
+            if hasattr(creditor_type, "value"):
+                av["creditor_type"] = creditor_type.value
+
+    # Handle optional routing fields
+    selected_network = d.get("selected_network")
+    if selected_network and hasattr(selected_network, "value"):
+        d["selected_network"] = selected_network.value
+
+    agent_chain = d.get("agent_chain")
+    if agent_chain and isinstance(agent_chain, list):
+        # agent_chain is already a list of dicts from asdict(), no conversion needed
+        pass
+
     return d
 
 

@@ -1,0 +1,49 @@
+docker exec -it kafka kafka-console-consumer `
+--bootstrap-server localhost:9092 `
+--topic payments.orchestrator.in `
+--from-beginning
+
+docker exec -it kafka kafka-console-consumer `
+--bootstrap-server localhost:9092 `
+--topic service.results.account_validation `
+--from-beginning
+
+docker exec -it kafka kafka-console-consumer `
+--bootstrap-server localhost:9092 `
+--topic payments.step.routing_validation `
+--from-beginning
+
+docker exec -it kafka kafka-console-consumer `
+--bootstrap-server localhost:9092 `
+--topic payments.step.sanctions_check `
+--from-beginning
+
+docker exec -it kafka kafka-console-consumer `
+--bootstrap-server localhost:9092 `
+--topic payments.step.payment_posting `
+--from-beginning
+
+docker exec -it kafka kafka-console-consumer `
+--bootstrap-server localhost:9092 `
+--topic service.results.sanctions_check `
+--from-beginning
+
+docker exec -it kafka kafka-console-consumer `
+--bootstrap-server localhost:9092 `
+--topic payments.step.balance_check `
+--from-beginning
+
+docker exec -it kafka kafka-console-consumer `
+--bootstrap-server localhost:9092 `
+--topic payments.step.payment_posting `
+--from-beginning
+
+docker exec -it kafka kafka-console-consumer `
+--bootstrap-server localhost:9092 `
+--topic service.results.balance_check `
+--from-beginning
+
+docker exec -it kafka kafka-console-consumer `
+--bootstrap-server localhost:9092 `
+--topic service.errors.balance_check `
+--from-beginning

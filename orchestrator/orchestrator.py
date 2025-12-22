@@ -49,10 +49,12 @@ class PaymentOrchestrator:
         ingress_topics = [topics.TOPIC_CANONICAL_INGRESS]
         results_topics = [
             topics.TOPIC_ACCOUNT_VALIDATION_OUT,
+            topics.TOPIC_ROUTING_VALIDATION_OUT,
             topics.TOPIC_SANCTIONS_CHECK_OUT,
             topics.TOPIC_BALANCE_CHECK_OUT,
             topics.TOPIC_PAYMENT_POSTING_OUT,
             topics.TOPIC_ACCOUNT_VALIDATION_ERR,
+            topics.TOPIC_ROUTING_VALIDATION_ERR,
             topics.TOPIC_SANCTIONS_CHECK_ERR,
             topics.TOPIC_BALANCE_CHECK_ERR,
             topics.TOPIC_PAYMENT_POSTING_ERR,
@@ -123,7 +125,14 @@ class PaymentOrchestrator:
 
         svc = result.service_name.strip().lower()
         if svc == "account_validation":
-            self._publish_to_step(topics.TOPIC_SANCTIONS_CHECK_IN, event)
+            # Account validation publishes enriched PaymentEvent directly to routing_validation topic.
+            # Orchestrator just waits for routing_validation ServiceResult.
+            pass
+        elif svc == "routing_validation":
+            # Routing validation publishes routed PaymentEvent directly to sanctions_check INPUT topic
+            # (like account_validation publishes to routing_validation INPUT).
+            # Orchestrator just waits for sanctions_check ServiceResult.
+            pass
         elif svc == "sanctions_check":
             self._publish_to_step(topics.TOPIC_BALANCE_CHECK_IN, event)
         elif svc == "balance_check":
@@ -210,10 +219,12 @@ def main():
         bootstrap_servers="localhost:9092",
         topics=[
             "service.results.account_validation",
+            "service.results.routing_validation",
             "service.results.sanctions_check",
             "service.results.balance_check",
             "service.results.payment_posting",
             "service.errors.account_validation",
+            "service.errors.routing_validation",
             "service.errors.sanctions_check",
             "service.errors.balance_check",
             "service.errors.payment_posting",

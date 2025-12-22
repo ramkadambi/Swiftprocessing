@@ -5,7 +5,16 @@ import json
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Optional, Union
 
-from canonical import Agent, PaymentEvent, PaymentStatus, ServiceResult, ServiceResultStatus
+from canonical import (
+    AccountValidationEnrichment,
+    Agent,
+    CreditorType,
+    PaymentEvent,
+    PaymentStatus,
+    RoutingNetwork,
+    ServiceResult,
+    ServiceResultStatus,
+)
 
 
 class PaymentEventDeserializeError(ValueError):
@@ -55,6 +64,43 @@ def payment_event_from_json(value: Union[bytes, str]) -> PaymentEvent:
             country=d.get("country"),
         )
 
+    # Handle optional account_validation enrichment
+    account_validation = None
+    av_data = data.get("account_validation")
+    if av_data and isinstance(av_data, dict):
+        try:
+            av_status = ServiceResultStatus(str(av_data.get("status", "")))
+            creditor_type = CreditorType(str(av_data.get("creditor_type", "")))
+            account_validation = AccountValidationEnrichment(
+                status=av_status,
+                creditor_type=creditor_type,
+                fed_member=bool(av_data.get("fed_member", False)),
+                chips_member=bool(av_data.get("chips_member", False)),
+                nostro_with_us=bool(av_data.get("nostro_with_us", False)),
+                vostro_with_us=bool(av_data.get("vostro_with_us", False)),
+                preferred_correspondent=av_data.get("preferred_correspondent"),
+            )
+        except Exception:
+            # If enrichment data is malformed, ignore it (optional field)
+            account_validation = None
+
+    # Handle optional routing fields
+    selected_network = None
+    if "selected_network" in data:
+        try:
+            selected_network = RoutingNetwork(str(data["selected_network"]))
+        except (ValueError, TypeError):
+            selected_network = None
+
+    agent_chain = None
+    if "agent_chain" in data and data["agent_chain"]:
+        try:
+            agent_chain = [_agent_from(ag) for ag in data["agent_chain"]]
+        except Exception:
+            agent_chain = None
+
+    routing_rule_applied = data.get("routing_rule_applied")
+
     return PaymentEvent(
         msg_id=str(data["msg_id"]),
         end_to_end_id=str(data["end_to_end_id"]),
@@ -63,6 +109,10 @@ def payment_event_from_json(value: Union[bytes, str]) -> PaymentEvent:
         debtor_agent=_agent_from(debtor),
         creditor_agent=_agent_from(creditor),
         status=st,
+        account_validation=account_validation,
+        selected_network=selected_network,
+        agent_chain=agent_chain,
+        routing_rule_applied=routing_rule_applied,
     )
 
 
