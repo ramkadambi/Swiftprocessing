@@ -1,0 +1,28 @@
+================================================================================
+EGRESS OUTPUT: R6_CROSSBORDER_SWIFT_pacs008.xml
+================================================================================
+
+Input File: R6_CROSSBORDER_SWIFT_pacs008.xml
+End-to-End ID: E2E-R6-SWIFT-001
+Selected Network: RoutingNetwork.SWIFT
+Routing Rule Applied: WF-MT103-R6-CROSSBORDER-OUT-SWIFT
+
+Output Network: SWIFT_MT103
+
+--------------------------------------------------------------------------------
+EGRESS MESSAGE:
+--------------------------------------------------------------------------------
+
+:20:R6-SWIFT-001
+:23B:CRED
+:32A:251223USD7500,00
+:50A:CHASUS33XXX
+:52A:CHASUS33XXX
+:57A:BAMXMXMMXXX
+:59:/BAMXMXMM
+BAMXMXMMXXX
+:70:E2E-R6-SWIFT-001
+:71A:SHAR
+
+
+================================================================================

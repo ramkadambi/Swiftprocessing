@@ -6,6 +6,7 @@ clearing and routing decisions. In production, this would query a real database.
 """
 
 from canonical import AccountValidationEnrichment, CreditorType, ServiceResultStatus
+from satellites import bic_lookup
 
 
 # In-memory lookup: creditor BIC -> enrichment data
@@ -20,7 +21,7 @@ _ACCOUNT_LOOKUP: dict[str, dict] = {
         "vostro_with_us": False,
         "preferred_correspondent": "WFBIUS6SXXX",
     },
-    "CHASEUS33": {
+    "CHASUS33": {
         "creditor_type": CreditorType.BANK,
         "fed_member": True,
         "chips_member": True,
@@ -36,6 +37,22 @@ _ACCOUNT_LOOKUP: dict[str, dict] = {
         "vostro_with_us": False,
         "preferred_correspondent": "BOFAUS3NXXX",
     },
+    "USBKUS44": {
+        "creditor_type": CreditorType.BANK,
+        "fed_member": True,
+        "chips_member": False,
+        "nostro_with_us": True,
+        "vostro_with_us": False,
+        "preferred_correspondent": "USBKUS44XXX",
+    },
+    "WFBIUS6S": {
+        "creditor_type": CreditorType.BANK,
+        "fed_member": True,
+        "chips_member": True,
+        "nostro_with_us": True,
+        "vostro_with_us": False,
+        "preferred_correspondent": "WFBIUS6SXXX",
+    },
     # Foreign banks - CHIPS only
     "DEUTDEFF": {
         "creditor_type": CreditorType.BANK,
@@ -44,6 +61,22 @@ _ACCOUNT_LOOKUP: dict[str, dict] = {
         "nostro_with_us": False,
         "vostro_with_us": True,
         "preferred_correspondent": "DEUTDEFFXXX",
+    },
+    "SBININBB": {
+        "creditor_type": CreditorType.BANK,
+        "fed_member": False,
+        "chips_member": False,
+        "nostro_with_us": False,
+        "vostro_with_us": True,
+        "preferred_correspondent": "SBININBBXXX",
+    },
+    "BAMXMXMM": {
+        "creditor_type": CreditorType.BANK,
+        "fed_member": False,
+        "chips_member": False,
+        "nostro_with_us": False,
+        "vostro_with_us": False,
+        "preferred_correspondent": "BAMXMXMMXXX",
     },
     "HSBCGB2L": {
         "creditor_type": CreditorType.BANK,
@@ -69,6 +102,9 @@ def lookup_account_enrichment(creditor_bic: str) -> dict | None:
     """
     Lookup account enrichment data by creditor BIC.
     
+    Uses BIC lookup utility to get FED/CHIPS membership, then enriches with
+    account-specific data (nostro/vostro, preferred correspondent).
+    
     Returns None if account not found (will result in validation FAIL).
     """
     if not creditor_bic:
@@ -76,7 +112,21 @@ def lookup_account_enrichment(creditor_bic: str) -> dict | None:
     
     # Normalize BIC to BIC8 (first 8 chars) for lookup
     bic8 = creditor_bic.strip().upper()[:8]
-    return _ACCOUNT_LOOKUP.get(bic8)
+    
+    # Get base account data
+    account_data = _ACCOUNT_LOOKUP.get(bic8)
+    if account_data is None:
+        return None
+    
+    # Enrich with BIC lookup data (FED/CHIPS membership from BIC directory)
+    bic_data = bic_lookup.lookup_bic(creditor_bic)
+    if bic_data:
+        # Override FED/CHIPS membership from BIC lookup (more authoritative)
+        account_data = account_data.copy()
+        account_data["fed_member"] = bic_data.get("fed_member", account_data.get("fed_member", False))
+        account_data["chips_member"] = bic_data.get("chips_member", account_data.get("chips_member", False))
+    
+    return account_data
 
 
 def enrich_payment_event(

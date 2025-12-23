@@ -8,6 +8,8 @@ from typing import Any, Callable, Optional, Union
 from canonical import PaymentEvent, ServiceResult, ServiceResultStatus
 from kafka_bus import KafkaConsumerWrapper, KafkaProducerWrapper
 from orchestrator import topics
+from satellites import settlement_account_lookup
+from satellites.ledger_service import get_account_balance, has_sufficient_balance
 
 
 SERVICE_NAME = "balance_check"
@@ -26,22 +28,96 @@ def _service_result_to_json_bytes(result: ServiceResult) -> bytes:
 
 def simulate_balance_check(event: PaymentEvent) -> ServiceResultStatus:
     """
-    Control-check simulation for funds availability. Deterministic and side-effect free.
-
-    Current rule:
-    - FAIL if amount > 10000 (in the given currency) OR end_to_end_id ends with 'B' (case-insensitive)
+    Balance check using ledger service to validate sufficient funds.
+    
+    Determines the debit account based on payment routing and checks if it has
+    sufficient balance in the ledger.
+    
+    Rules:
+    - FAIL if insufficient balance in debit account
+    - FAIL if debit account not found in ledger
+    - FAIL if end_to_end_id ends with 'B' (case-insensitive) - legacy rule
+    - ERROR if account lookup fails
     - PASS otherwise
     """
-
-    try:
-        if event.amount > Decimal("10000"):
-            return ServiceResultStatus.FAIL
-    except Exception:
-        return ServiceResultStatus.ERROR
-
+    
+    # Legacy rule: fail if end_to_end_id ends with 'B'
     if event.end_to_end_id.strip().upper().endswith("B"):
         return ServiceResultStatus.FAIL
-
+    
+    # Determine debit account from payment event
+    # This should match the logic in payment_posting._determine_settlement_accounts
+    debtor_bic = (event.debtor_agent.id_value or "").strip().upper()[:8]
+    creditor_bic = (event.creditor_agent.id_value or "").strip().upper()[:8]
+    debtor_country = event.debtor_agent.country or ""
+    creditor_country = event.creditor_agent.country or ""
+    
+    WELLS_BIC = "WFBIUS6S"
+    is_inbound = debtor_country != "US" and creditor_bic == WELLS_BIC
+    is_outbound = debtor_bic == WELLS_BIC and creditor_country != "US"
+    
+    debit_account_id: Optional[str] = None
+    
+    # Determine debit account based on routing network
+    if event.selected_network:
+        if event.selected_network.value == "INTERNAL":
+            if is_inbound:
+                # Debit from foreign bank's vostro account
+                vostro = settlement_account_lookup.lookup_vostro_account(debtor_bic)
+                if vostro:
+                    debit_account_id = vostro["account_number"]
+                else:
+                    debit_account_id = debtor_bic
+            else:
+                debit_account_id = debtor_bic
+        elif event.selected_network.value == "FED":
+            if is_inbound:
+                vostro = settlement_account_lookup.lookup_vostro_account(debtor_bic)
+                if vostro:
+                    debit_account_id = vostro["account_number"]
+                else:
+                    debit_account_id = debtor_bic
+            else:
+                debit_account_id = debtor_bic
+        elif event.selected_network.value == "CHIPS":
+            if is_inbound:
+                vostro = settlement_account_lookup.lookup_vostro_account(debtor_bic)
+                if vostro:
+                    debit_account_id = vostro["account_number"]
+                else:
+                    debit_account_id = debtor_bic
+            else:
+                debit_account_id = debtor_bic
+        elif event.selected_network.value == "SWIFT":
+            if is_outbound:
+                debit_account_id = debtor_bic
+            else:
+                vostro = settlement_account_lookup.lookup_vostro_account(debtor_bic)
+                if vostro:
+                    debit_account_id = vostro["account_number"]
+                else:
+                    debit_account_id = debtor_bic
+        else:
+            debit_account_id = debtor_bic
+    else:
+        # No routing network selected yet - use debtor BIC
+        debit_account_id = debtor_bic
+    
+    if not debit_account_id:
+        return ServiceResultStatus.ERROR
+    
+    # Check balance in ledger
+    if not has_sufficient_balance(debit_account_id, event.amount):
+        print(
+            f"[BalanceCheck] Insufficient balance: account={debit_account_id}, "
+            f"required={event.amount}, available={get_account_balance(debit_account_id) or 0}"
+        )
+        return ServiceResultStatus.FAIL
+    
+    print(
+        f"[BalanceCheck] Sufficient balance: account={debit_account_id}, "
+        f"required={event.amount}, available={get_account_balance(debit_account_id) or 0}"
+    )
     return ServiceResultStatus.PASS
 
 
@@ -90,8 +166,11 @@ class BalanceCheckService:
         max_messages: Optional[int] = None,
         on_error: Optional[Callable[[Exception], Any]] = None,
     ) -> int:
+        from kafka_bus.consumer import payment_event_from_json
+        
         return self._consumer.run(
             self._handle_event,
+            deserializer=payment_event_from_json,
             poll_timeout_s=poll_timeout_s,
             max_messages=max_messages,
             on_error=on_error,

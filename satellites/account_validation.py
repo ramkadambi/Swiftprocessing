@@ -133,8 +133,11 @@ class AccountValidationService:
         max_messages: Optional[int] = None,
         on_error: Optional[Callable[[Exception], Any]] = None,
     ) -> int:
+        from kafka_bus.consumer import payment_event_from_json
+        
         return self._consumer.run(
             self._handle_event,
+            deserializer=payment_event_from_json,
             poll_timeout_s=poll_timeout_s,
             max_messages=max_messages,
             on_error=on_error,

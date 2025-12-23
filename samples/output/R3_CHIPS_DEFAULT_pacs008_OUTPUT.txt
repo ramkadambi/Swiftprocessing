@@ -1,0 +1,47 @@
+================================================================================
+EGRESS OUTPUT: R3_CHIPS_DEFAULT_pacs008.xml
+================================================================================
+
+Input File: R3_CHIPS_DEFAULT_pacs008.xml
+End-to-End ID: E2E-R3-CHIPS-001
+Selected Network: RoutingNetwork.CHIPS
+Routing Rule Applied: WF-MT103-R3-CHIPS-DEFAULT
+
+Output Network: CHIPS
+
+--------------------------------------------------------------------------------
+EGRESS MESSAGE:
+--------------------------------------------------------------------------------
+
+<?xml version='1.0' encoding='UTF-8'?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.009.001.08">
+  <FICdtTrf>
+    <GrpHdr>
+      <MsgId>R3-CHIPS-001</MsgId>
+      <CreDtTm>2025-12-23T04:53:39.254041Z</CreDtTm>
+      <NbOfTxs>1</NbOfTxs>
+      <SttlmInf>
+        <SttlmMtd>CLRG</SttlmMtd>
+      </SttlmInf>
+    </GrpHdr>
+    <CdtTrfTxInf>
+      <PmtId>
+        <EndToEndId>E2E-R3-CHIPS-001</EndToEndId>
+      </PmtId>
+      <IntrBkSttlmAmt Ccy="USD">8000.00</IntrBkSttlmAmt>
+      <InstgAgt>
+        <FinInstnId>
+          <BICFI>CHASUS33XXX</BICFI>
+        </FinInstnId>
+      </InstgAgt>
+      <InstdAgt>
+        <FinInstnId>
+          <BICFI>DEUTDEFFXXX</BICFI>
+        </FinInstnId>
+      </InstdAgt>
+    </CdtTrfTxInf>
+  </FICdtTrf>
+</Document>
+
+
+================================================================================

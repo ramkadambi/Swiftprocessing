@@ -1,0 +1,49 @@
+================================================================================
+EGRESS OUTPUT: R4_FED_ONLY_pacs008.xml
+================================================================================
+
+Input File: R4_FED_ONLY_pacs008.xml
+End-to-End ID: E2E-R4-FED-001
+Selected Network: RoutingNetwork.FED
+Routing Rule Applied: WF-MT103-R4-FED-ONLY
+
+Output Network: FED
+
+--------------------------------------------------------------------------------
+EGRESS MESSAGE:
+--------------------------------------------------------------------------------
+
+<?xml version='1.0' encoding='UTF-8'?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08">
+  <FIToFICstmrCdtTrf>
+    <GrpHdr>
+      <MsgId>R4-FED-001</MsgId>
+      <CreDtTm>2025-12-23T04:53:39.266759Z</CreDtTm>
+      <NbOfTxs>1</NbOfTxs>
+      <SttlmInf>
+        <SttlmMtd>CLRG</SttlmMtd>
+      </SttlmInf>
+    </GrpHdr>
+    <CdtTrfTxInf>
+      <PmtId>
+        <EndToEndId>E2E-R4-FED-001</EndToEndId>
+      </PmtId>
+      <Amt>
+        <InstdAmt Ccy="USD">8000.00</InstdAmt>
+      </Amt>
+      <DbtrAgt>
+        <FinInstnId>
+          <BICFI>CHASUS33XXX</BICFI>
+        </FinInstnId>
+      </DbtrAgt>
+      <CdtrAgt>
+        <FinInstnId>
+          <BICFI>USBKUS44XXX</BICFI>
+        </FinInstnId>
+      </CdtrAgt>
+    </CdtTrfTxInf>
+  </FIToFICstmrCdtTrf>
+</Document>
+
+
+================================================================================

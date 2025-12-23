@@ -56,6 +56,7 @@ class Pacs008Extract:
     currency: str
     debtor_bic: str
     creditor_bic: str
+    intermediary_bic: Optional[str] = None
 
 
 def extract_pacs008_fields(xml: Union[str, bytes]) -> Pacs008Extract:
@@ -128,6 +129,14 @@ def extract_pacs008_fields(xml: Union[str, bytes]) -> Pacs008Extract:
         "/*[local-name()='BICFI']/text()",
     )
 
+    # Extract intermediary agent (IntrmyAgt1) if present
+    intermediary_bic = _first_text(
+        tx,
+        "./*[local-name()='IntrmyAgt1']"
+        "/*[local-name()='FinInstnId']"
+        "/*[local-name()='BICFI']/text()",
+    )
+
     missing = []
     if not msg_id:
         missing.append("GrpHdr/MsgId")
@@ -156,6 +165,7 @@ def extract_pacs008_fields(xml: Union[str, bytes]) -> Pacs008Extract:
         currency=currency,
         debtor_bic=debtor_bic,
         creditor_bic=creditor_bic,
+        intermediary_bic=intermediary_bic,
     )
 
 
@@ -165,6 +175,22 @@ def pacs008_xml_to_payment_event(xml: Union[str, bytes]) -> PaymentEvent:
     """
 
     data = extract_pacs008_fields(xml)
+    
+    # Build agent_chain if intermediary is present
+    agent_chain = None
+    if data.intermediary_bic:
+        # Get country from BIC lookup if available
+        from satellites import bic_lookup
+        intermediary_data = bic_lookup.lookup_bic(data.intermediary_bic)
+        intermediary_country = intermediary_data.get("country") if intermediary_data else None
+        agent_chain = [
+            Agent(
+                id_scheme="BIC",
+                id_value=data.intermediary_bic,
+                country=intermediary_country,
+            )
+        ]
+    
     return PaymentEvent(
         msg_id=data.msg_id,
         end_to_end_id=data.end_to_end_id,
@@ -173,6 +199,7 @@ def pacs008_xml_to_payment_event(xml: Union[str, bytes]) -> PaymentEvent:
         debtor_agent=Agent(id_scheme="BIC", id_value=data.debtor_bic),
         creditor_agent=Agent(id_scheme="BIC", id_value=data.creditor_bic),
         status=PaymentStatus.RECEIVED,
+        agent_chain=agent_chain,
     )
 
 

@@ -7,10 +7,19 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Callable, Optional, Union
 
-from canonical import Agent, PaymentEvent, RoutingNetwork, ServiceResult, ServiceResultStatus
+from canonical import (
+    Agent,
+    PaymentEvent,
+    RoutingDecision,
+    RoutingNetwork,
+    ServiceResult,
+    ServiceResultStatus,
+    Urgency,
+)
 from ingress.mx_receiver import payment_event_to_json_bytes
 from kafka_bus import KafkaConsumerWrapper, KafkaProducerWrapper
 from orchestrator import topics
+from satellites import aba_lookup, bic_lookup, chips_lookup
 
 
 SERVICE_NAME = "routing_validation"
@@ -36,7 +45,8 @@ def _load_routing_rules(config_path: str | Path) -> list[dict[str, Any]]:
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
     
-    rules = data.get("routing_rules", [])
+    # Support both "routing_rules" and "rules" keys
+    rules = data.get("routing_rules", data.get("rules", []))
     # Sort by priority (lower number = higher priority)
     rules.sort(key=lambda r: r.get("priority", 999))
     return rules
@@ -44,12 +54,67 @@ def _load_routing_rules(config_path: str | Path) -> list[dict[str, Any]]:
 
 def _build_routing_context(event: PaymentEvent) -> dict[str, Any]:
     """Build routing context from PaymentEvent for rule matching."""
+    # Use BIC lookup to enrich context
+    creditor_bic = event.creditor_agent.id_value or ""
+    bic_data = bic_lookup.lookup_bic(creditor_bic) if creditor_bic else None
+    
+    creditor_country = event.creditor_agent.country
+    if not creditor_country and bic_data:
+        creditor_country = bic_data.get("country")
+    
+    # Get intermediary bank info if present
+    intermediary_bic = None
+    intermediary_bic_data = None
+    if event.agent_chain and len(event.agent_chain) > 0:
+        intermediary_bic = event.agent_chain[0].id_value or ""
+        if intermediary_bic:
+            intermediary_bic_data = bic_lookup.lookup_bic(intermediary_bic)
+    
+    # Determine "next bank" - the bank we're routing to (creditor or intermediary)
+    next_bank_bic = intermediary_bic or creditor_bic
+    next_bank_data = intermediary_bic_data or bic_data
+    
     ctx: dict[str, Any] = {
         "currency": event.currency,
         "amount": float(event.amount),
         "sender_country": event.debtor_agent.country or "UNKNOWN",
-        "creditor_country": event.creditor_agent.country or "UNKNOWN",
+        "creditor_country": creditor_country or "UNKNOWN",
+        "ultimate_creditor_country": creditor_country or "UNKNOWN",  # For routing_rulesV2.json
     }
+    
+    # Add MT103-style fields for routing_rulesV2.json compatibility
+    ctx["mt103"] = {
+        "credit_agent_bic": creditor_bic,
+        "intermediary_bic": intermediary_bic,
+        "debtor_agent_bic": event.debtor_agent.id_value or "",
+    }
+    
+    # Add BIC lookup data
+    if bic_data:
+        ctx["bic_lookup"] = {
+            "bank_name": bic_data.get("bank_name"),
+            "country": bic_data.get("country"),
+            "fed_member": bic_data.get("fed_member", False),
+            "chips_member": bic_data.get("chips_member", False),
+            "aba_routing": bic_data.get("aba_routing"),
+            "chips_uid": bic_data.get("chips_uid"),
+        }
+    
+    # Add "next_bank" data for routing_rulesV2.json
+    if next_bank_data:
+        ctx["next_bank"] = {
+            "chips_id_exists": bool(next_bank_data.get("chips_uid")),
+            "aba_exists": bool(next_bank_data.get("aba_routing")),
+            "bic": next_bank_bic,
+            "country": next_bank_data.get("country"),
+        }
+    else:
+        ctx["next_bank"] = {
+            "chips_id_exists": False,
+            "aba_exists": False,
+            "bic": next_bank_bic,
+            "country": None,
+        }
     
     if event.account_validation:
         av = event.account_validation
@@ -61,6 +126,17 @@ def _build_routing_context(event: PaymentEvent) -> dict[str, Any]:
             "vostro_with_us": av.vostro_with_us,
             "preferred_correspondent": av.preferred_correspondent,
         }
+    
+    # Add payment ecosystem context (for R5 decision_matrix)
+    # In production, this would come from external services
+    ctx["payment_ecosystem"] = {
+        "chips_cutoff_passed": False,  # Default, can be overridden in tests
+        "chips_queue_depth": "NORMAL",  # NORMAL | HIGH
+    }
+    
+    # Add routing context (for R5 decision_matrix)
+    ctx["customer_preference"] = None  # FED | CHIPS | NONE
+    ctx["payment_urgency"] = "NORMAL"  # NORMAL | HIGH
     
     return ctx
 
@@ -90,6 +166,39 @@ def _match_rule_conditions(ctx: dict[str, Any], conditions: dict[str, Any]) -> b
         if ctx.get("creditor_country") != conditions["creditor_country"]:
             return False
     
+    # MT103-style conditions (for routing_rulesV2.json)
+    if "mt103.credit_agent_bic" in conditions:
+        mt103_ctx = ctx.get("mt103", {})
+        if mt103_ctx.get("credit_agent_bic", "").upper() != conditions["mt103.credit_agent_bic"].upper():
+            return False
+    
+    if "mt103.intermediary_bic" in conditions:
+        mt103_ctx = ctx.get("mt103", {})
+        ctx_intermediary = mt103_ctx.get("intermediary_bic") or ""
+        cond_intermediary = conditions["mt103.intermediary_bic"] or ""
+        if ctx_intermediary.upper() != cond_intermediary.upper():
+            return False
+    
+    # Ultimate creditor country (for routing_rulesV2.json)
+    if "ultimate_creditor_country" in conditions:
+        if ctx.get("ultimate_creditor_country") != conditions["ultimate_creditor_country"]:
+            return False
+    
+    if "ultimate_creditor_country_not" in conditions:
+        if ctx.get("ultimate_creditor_country") == conditions["ultimate_creditor_country_not"]:
+            return False
+    
+    # Next bank conditions (for routing_rulesV2.json)
+    if "next_bank.chips_id_exists" in conditions:
+        next_bank = ctx.get("next_bank", {})
+        if next_bank.get("chips_id_exists") != conditions["next_bank.chips_id_exists"]:
+            return False
+    
+    if "next_bank.aba_exists" in conditions:
+        next_bank = ctx.get("next_bank", {})
+        if next_bank.get("aba_exists") != conditions["next_bank.aba_exists"]:
+            return False
+    
     # Account validation conditions
     if "account_validation" in conditions:
         av_cond = conditions["account_validation"]
@@ -105,62 +214,165 @@ def _match_rule_conditions(ctx: dict[str, Any], conditions: dict[str, Any]) -> b
     return True
 
 
+def _create_routing_decision(
+    event: PaymentEvent, rule: dict[str, Any], ctx: dict[str, Any], selected_network: RoutingNetwork
+) -> RoutingDecision:
+    """Create RoutingDecision object from rule actions and context."""
+    actions = rule.get("actions", {})
+    
+    # Get BIC lookup data
+    creditor_bic = event.creditor_agent.id_value or ""
+    bic_data = bic_lookup.lookup_bic(creditor_bic) if creditor_bic else None
+    
+    # Determine intermediary bank from agent_chain or actions
+    intermediary_bank: Optional[Agent] = None
+    
+    # Check if we need to insert/substitute intermediary
+    if "insert_intermediary" in actions:
+        insert_action = actions["insert_intermediary"]
+        agent_data = insert_action.get("agent", {})
+        agent_id_value = agent_data.get("id_value", "")
+        
+        # Resolve template variables
+        if agent_id_value.startswith("${") and agent_id_value.endswith("}"):
+            var_path = agent_id_value[2:-1]
+            parts = var_path.split(".")
+            if len(parts) == 2 and parts[0] == "account_validation":
+                agent_id_value = ctx.get("account_validation", {}).get(parts[1], "")
+        
+        # Lookup intermediary BIC data
+        intermediary_bic_data = bic_lookup.lookup_bic(agent_id_value) if agent_id_value else None
+        intermediary_bank = Agent(
+            id_scheme=agent_data.get("id_scheme", "BIC"),
+            id_value=agent_id_value,
+            name=agent_data.get("name") or (intermediary_bic_data.get("bank_name") if intermediary_bic_data else None),
+            country=intermediary_bic_data.get("country") if intermediary_bic_data else None,
+        )
+    elif "substitute_intermediary" in actions:
+        sub_action = actions["substitute_intermediary"]
+        agent_data = sub_action.get("agent", {})
+        agent_id_value = agent_data.get("id_value", "")
+        
+        # Resolve template variables
+        if agent_id_value.startswith("${") and agent_id_value.endswith("}"):
+            var_path = agent_id_value[2:-1]
+            parts = var_path.split(".")
+            if len(parts) == 2 and parts[0] == "account_validation":
+                agent_id_value = ctx.get("account_validation", {}).get(parts[1], "")
+        
+        # Lookup intermediary BIC data
+        intermediary_bic_data = bic_lookup.lookup_bic(agent_id_value) if agent_id_value else None
+        intermediary_bank = Agent(
+            id_scheme=agent_data.get("id_scheme", "BIC"),
+            id_value=agent_id_value,
+            name=agent_data.get("name") or (intermediary_bic_data.get("bank_name") if intermediary_bic_data else None),
+            country=intermediary_bic_data.get("country") if intermediary_bic_data else None,
+        )
+    
+    # Build creditor bank with enriched data
+    creditor_bank = Agent(
+        id_scheme=event.creditor_agent.id_scheme,
+        id_value=event.creditor_agent.id_value,
+        name=event.creditor_agent.name or (bic_data.get("bank_name") if bic_data else None),
+        country=event.creditor_agent.country or (bic_data.get("country") if bic_data else None),
+    )
+    
+    # Build sender bank (debtor agent)
+    sender_bic = event.debtor_agent.id_value or ""
+    sender_bic_data = bic_lookup.lookup_bic(sender_bic) if sender_bic else None
+    sender_bank = Agent(
+        id_scheme=event.debtor_agent.id_scheme,
+        id_value=event.debtor_agent.id_value,
+        name=event.debtor_agent.name or (sender_bic_data.get("bank_name") if sender_bic_data else None),
+        country=event.debtor_agent.country or (sender_bic_data.get("country") if sender_bic_data else None),
+    )
+    
+    # Determine urgency (default to NORMAL, could be extracted from PaymentEvent in future)
+    urgency = Urgency.NORMAL
+    
+    return RoutingDecision(
+        selected_network=selected_network,
+        sender_bank=sender_bank,
+        creditor_bank=creditor_bank,
+        intermediary_bank=intermediary_bank,
+        urgency=urgency,
+        customer_preference=None,  # Could be extracted from PaymentEvent in future
+        routing_rule_applied=rule.get("rule_id"),
+        bic_lookup_data=bic_data,
+        account_validation_data=event.account_validation,
+    )
+
+
 def _apply_rule_actions(
     event: PaymentEvent, rule: dict[str, Any], ctx: dict[str, Any]
 ) -> PaymentEvent:
     """Apply routing rule actions to PaymentEvent."""
     actions = rule.get("actions", {})
     
-    # Select network
+    # Check for decision_matrix (for R5 in routing_rulesV2.json)
     selected_network = None
-    if "select_network" in actions:
-        network_str = actions["select_network"]
-        try:
-            selected_network = RoutingNetwork(network_str)
-        except ValueError:
-            print(f"[RoutingValidation] WARNING: Invalid network '{network_str}', skipping")
+    if "decision_matrix" in rule:
+        decision_matrix = rule["decision_matrix"]
+        if_conditions = decision_matrix.get("if", [])
+        
+        # Evaluate if conditions in order
+        for condition_block in if_conditions:
+            condition_expr = condition_block.get("condition", "")
+            route_value = condition_block.get("route", "")
+            
+            # Parse condition expression
+            if "payment_ecosystem.chips_cutoff_passed == true" in condition_expr:
+                if ctx.get("payment_ecosystem", {}).get("chips_cutoff_passed", False):
+                    selected_network = RoutingNetwork(route_value)
+                    break
+            elif "payment_ecosystem.chips_queue_depth == HIGH" in condition_expr:
+                if ctx.get("payment_ecosystem", {}).get("chips_queue_depth") == "HIGH":
+                    selected_network = RoutingNetwork(route_value)
+                    break
+            elif "customer_preference == FED" in condition_expr:
+                if ctx.get("customer_preference") == "FED":
+                    selected_network = RoutingNetwork(route_value)
+                    break
+            elif "payment_urgency == HIGH" in condition_expr:
+                if ctx.get("payment_urgency") == "HIGH":
+                    selected_network = RoutingNetwork(route_value)
+                    break
+        
+        # If no if condition matched, use else
+        if selected_network is None:
+            else_block = decision_matrix.get("else", {})
+            route_value = else_block.get("route", "CHIPS")
+            selected_network = RoutingNetwork(route_value)
     
-    # Build agent chain
+    # Select network from actions (for routing_rules.json or routing_rulesV2.json)
+    if selected_network is None:
+        if "select_network" in actions:
+            network_str = actions["select_network"]
+            try:
+                selected_network = RoutingNetwork(network_str)
+            except ValueError:
+                print(f"[RoutingValidation] WARNING: Invalid network '{network_str}', skipping")
+                selected_network = RoutingNetwork.SWIFT  # Fallback
+        elif "selected_network" in actions:
+            network_str = actions["selected_network"]
+            try:
+                selected_network = RoutingNetwork(network_str)
+            except ValueError:
+                print(f"[RoutingValidation] WARNING: Invalid network '{network_str}', skipping")
+                selected_network = RoutingNetwork.SWIFT  # Fallback
+    
+    if selected_network is None:
+        selected_network = RoutingNetwork.SWIFT  # Default fallback
+    
+    # Create RoutingDecision object
+    routing_decision = _create_routing_decision(event, rule, ctx, selected_network)
+    
+    # Build agent chain from routing decision
     agent_chain: list[Agent] = []
+    if routing_decision.intermediary_bank:
+        agent_chain.append(routing_decision.intermediary_bank)
     
-    # Insert intermediary
-    if "insert_intermediary" in actions:
-        insert_action = actions["insert_intermediary"]
-        agent_data = insert_action.get("agent", {})
-        # Resolve template variables (e.g., ${account_validation.preferred_correspondent})
-        agent_id_value = agent_data.get("id_value", "")
-        if agent_id_value.startswith("${") and agent_id_value.endswith("}"):
-            var_path = agent_id_value[2:-1]
-            parts = var_path.split(".")
-            if len(parts) == 2 and parts[0] == "account_validation":
-                agent_id_value = ctx.get("account_validation", {}).get(parts[1], "")
-        
-        intermediary = Agent(
-            id_scheme=agent_data.get("id_scheme", "BIC"),
-            id_value=agent_id_value,
-            name=agent_data.get("name"),
-        )
-        agent_chain.append(intermediary)
-    
-    # Substitute intermediary (same as insert for now)
-    if "substitute_intermediary" in actions:
-        sub_action = actions["substitute_intermediary"]
-        agent_data = sub_action.get("agent", {})
-        agent_id_value = agent_data.get("id_value", "")
-        if agent_id_value.startswith("${") and agent_id_value.endswith("}"):
-            var_path = agent_id_value[2:-1]
-            parts = var_path.split(".")
-            if len(parts) == 2 and parts[0] == "account_validation":
-                agent_id_value = ctx.get("account_validation", {}).get(parts[1], "")
-        
-        intermediary = Agent(
-            id_scheme=agent_data.get("id_scheme", "BIC"),
-            id_value=agent_id_value,
-            name=agent_data.get("name"),
-        )
-        agent_chain.append(intermediary)
-    
-    # Create enriched PaymentEvent
+    # Create enriched PaymentEvent with routing decision
     return PaymentEvent(
         msg_id=event.msg_id,
         end_to_end_id=event.end_to_end_id,
@@ -173,6 +385,7 @@ def _apply_rule_actions(
         selected_network=selected_network,
         agent_chain=agent_chain if agent_chain else None,
         routing_rule_applied=rule.get("rule_id"),
+        routing_decision=routing_decision,
     )
 
 
@@ -186,6 +399,29 @@ def _apply_routing_rules(event: PaymentEvent, rules: list[dict[str, Any]]) -> Pa
             print(
                 f"[RoutingValidation] Rule matched: {rule.get('rule_id')} - {rule.get('description')}"
             )
+            
+            # Check if rule only invokes services (like R2) without routing
+            actions = rule.get("actions", {})
+            if "invoke_services" in actions and "selected_network" not in actions and "select_network" not in actions:
+                # Rule only invokes services, continue to next rule
+                print(f"[RoutingValidation] Rule {rule.get('rule_id')} only invokes services, continuing to next rule")
+                # Note: In production, invoke_services would enrich the context
+                # For R2, after invoking services, we need to update next_bank to point to creditor bank
+                # (not intermediary) for subsequent rules to check creditor's CHIPS/FED capabilities
+                if rule.get("rule_id") == "WF-MT103-R2-US-INTERMEDIARY-LOOKUP":
+                    # Update next_bank to creditor bank (not intermediary) for subsequent rule matching
+                    creditor_bic = event.creditor_agent.id_value or ""
+                    creditor_bic_data = bic_lookup.lookup_bic(creditor_bic) if creditor_bic else None
+                    if creditor_bic_data:
+                        ctx["next_bank"] = {
+                            "chips_id_exists": bool(creditor_bic_data.get("chips_uid")),
+                            "aba_exists": bool(creditor_bic_data.get("aba_routing")),
+                            "bic": creditor_bic,
+                            "country": creditor_bic_data.get("country"),
+                        }
+                    print(f"[RoutingValidation] Updated next_bank to creditor bank: {creditor_bic}")
+                continue
+            
             return _apply_rule_actions(event, rule, ctx)
     
     # No rule matched - this should not happen if fallback rule exists
@@ -299,7 +535,9 @@ class RoutingValidationService:
             return result
             
         except Exception as e:
-            print(f"[RoutingValidation] ERROR processing E2E={event.end_to_end_id}: {e}", exc_info=True)
+            import traceback
+            print(f"[RoutingValidation] ERROR processing E2E={event.end_to_end_id}: {e}")
+            traceback.print_exc()
             result = ServiceResult(
                 end_to_end_id=event.end_to_end_id,
                 service_name=self._service_name,
@@ -317,8 +555,11 @@ class RoutingValidationService:
         max_messages: Optional[int] = None,
         on_error: Optional[Callable[[Exception], Any]] = None,
     ) -> int:
+        from kafka_bus.consumer import payment_event_from_json
+        
         return self._consumer.run(
             self._handle_event,
+            deserializer=payment_event_from_json,
             poll_timeout_s=poll_timeout_s,
             max_messages=max_messages,
             on_error=on_error,

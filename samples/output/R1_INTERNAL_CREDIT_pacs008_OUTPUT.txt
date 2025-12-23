@@ -1,0 +1,25 @@
+================================================================================
+EGRESS OUTPUT: R1_INTERNAL_CREDIT_pacs008.xml
+================================================================================
+
+Input File: R1_INTERNAL_CREDIT_pacs008.xml
+End-to-End ID: E2E-R1-INTERNAL-001
+Selected Network: RoutingNetwork.INTERNAL
+Routing Rule Applied: WF-MT103-R1-INTERNAL-CREDIT
+
+Output Network: INTERNAL
+
+--------------------------------------------------------------------------------
+EGRESS MESSAGE:
+--------------------------------------------------------------------------------
+
+{
+  "type": "INTERNAL_NOTIFICATION",
+  "end_to_end_id": "E2E-R1-INTERNAL-001",
+  "msg_id": "R1-INTERNAL-001",
+  "amount": "5000.00",
+  "currency": "USD",
+  "status": "POSTED"
+}
+
+================================================================================

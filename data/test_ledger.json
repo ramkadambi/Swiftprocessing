@@ -1,0 +1,240 @@
+{
+  "accounts": {
+    "WF-FED-SETTLE-001": {
+      "opening_balance": "50000000.0",
+      "current_balance": "50000000.0",
+      "currency": "USD",
+      "account_type": "FED"
+    },
+    "WF-VOSTRO-SBI-USD-001": {
+      "opening_balance": "1000000.0",
+      "current_balance": "970000.0",
+      "currency": "USD",
+      "account_type": "VOSTRO"
+    },
+    "WF-VOSTRO-DEUT-USD-001": {
+      "opening_balance": "2000000.0",
+      "current_balance": "2000000.0",
+      "currency": "USD",
+      "account_type": "VOSTRO"
+    },
+    "WF-VOSTRO-HSBC-USD-001": {
+      "opening_balance": "1500000.0",
+      "current_balance": "1500000.0",
+      "currency": "USD",
+      "account_type": "VOSTRO"
+    },
+    "WF-VOSTRO-BANAMEX-USD-001": {
+      "opening_balance": "800000.0",
+      "current_balance": "800000.0",
+      "currency": "USD",
+      "account_type": "VOSTRO"
+    },
+    "WF-VOSTRO-SCBL-USD-001": {
+      "opening_balance": "1200000.0",
+      "current_balance": "1200000.0",
+      "currency": "USD",
+      "account_type": "VOSTRO"
+    },
+    "WF-CHIPS-NOSTRO-CHASE-001": {
+      "opening_balance": "10000000.0",
+      "current_balance": "10000000.0",
+      "currency": "USD",
+      "account_type": "CHIPS_NOSTRO"
+    },
+    "WF-CHIPS-NOSTRO-BOFA-001": {
+      "opening_balance": "10000000.0",
+      "current_balance": "10000000.0",
+      "currency": "USD",
+      "account_type": "CHIPS_NOSTRO"
+    },
+    "WF-CHIPS-NOSTRO-CITI-001": {
+      "opening_balance": "8000000.0",
+      "current_balance": "8000000.0",
+      "currency": "USD",
+      "account_type": "CHIPS_NOSTRO"
+    },
+    "WF-CHIPS-NOSTRO-DEUT-001": {
+      "opening_balance": "5000000.0",
+      "current_balance": "5008000.0",
+      "currency": "USD",
+      "account_type": "CHIPS_NOSTRO"
+    },
+    "WF-CHIPS-NOSTRO-HSBC-001": {
+      "opening_balance": "5000000.0",
+      "current_balance": "5000000.0",
+      "currency": "USD",
+      "account_type": "CHIPS_NOSTRO"
+    },
+    "WF-SWIFT-NOSTRO-BANAMEX-001": {
+      "opening_balance": "3000000.0",
+      "current_balance": "3000000.0",
+      "currency": "USD",
+      "account_type": "SWIFT_NOSTRO"
+    },
+    "WF-SWIFT-NOSTRO-SBI-001": {
+      "opening_balance": "2000000.0",
+      "current_balance": "2000000.0",
+      "currency": "USD",
+      "account_type": "SWIFT_NOSTRO"
+    },
+    "WF-SWIFT-NOSTRO-DEUT-001": {
+      "opening_balance": "4000000.0",
+      "current_balance": "4000000.0",
+      "currency": "USD",
+      "account_type": "SWIFT_NOSTRO"
+    },
+    "WF-SWIFT-NOSTRO-HSBC-001": {
+      "opening_balance": "3500000.0",
+      "current_balance": "3500000.0",
+      "currency": "USD",
+      "account_type": "SWIFT_NOSTRO"
+    },
+    "WF-SWIFT-NOSTRO-SCBL-001": {
+      "opening_balance": "2500000.0",
+      "current_balance": "2500000.0",
+      "currency": "USD",
+      "account_type": "SWIFT_NOSTRO"
+    },
+    "WFBIUS6S": {
+      "opening_balance": "50000.0",
+      "current_balance": "85000.0",
+      "currency": "USD",
+      "account_type": "CUSTOMER"
+    },
+    "CHASUS33": {
+      "opening_balance": "100000.0",
+      "current_balance": 95499.0,
+      "currency": "USD",
+      "account_type": "CUSTOMER"
+    },
+    "BOFAUS3N": {
+      "opening_balance": "100000.0",
+      "current_balance": "91000.0",
+      "currency": "USD",
+      "account_type": "CUSTOMER"
+    },
+    "CITIUS33": {
+      "opening_balance": "100000.0",
+      "current_balance": "100000.0",
+      "currency": "USD",
+      "account_type": "CUSTOMER"
+    },
+    "USBKUS44": {
+      "opening_balance": "100000.0",
+      "current_balance": "108000.0",
+      "currency": "USD",
+      "account_type": "CUSTOMER"
+    },
+    "DEUTDEFF": {
+      "opening_balance": "200000.0",
+      "current_balance": "200000.0",
+      "currency": "USD",
+      "account_type": "CUSTOMER"
+    },
+    "HSBCGB2L": {
+      "opening_balance": "150000.0",
+      "current_balance": "150000.0",
+      "currency": "USD",
+      "account_type": "CUSTOMER"
+    },
+    "BAMXMXMM": {
+      "opening_balance": "100000.0",
+      "current_balance": 107500.0,
+      "currency": "USD",
+      "account_type": "CUSTOMER"
+    },
+    "SBININBB": {
+      "opening_balance": "100000.0",
+      "current_balance": "85001.0",
+      "currency": "USD",
+      "account_type": "CUSTOMER"
+    }
+  },
+  "processed_transactions": {
+    "E2E-003": {
+      "timestamp": "2025-12-23T01:24:01.870832+00:00",
+      "status": "POSTED",
+      "debit_account": "WF-VOSTRO-SBI-USD-001",
+      "credit_account": "WFBIUS6S",
+      "amount": 10000.0,
+      "currency": "USD"
+    },
+    "E2E-004": {
+      "timestamp": "2025-12-23T01:24:02.254397+00:00",
+      "status": "POSTED",
+      "debit_account": "WF-VOSTRO-SBI-USD-001",
+      "credit_account": "WFBIUS6S",
+      "amount": 5000.0,
+      "currency": "USD"
+    },
+    "E2E-TEST-508da834": {
+      "timestamp": "2025-12-23T01:25:46.173891+00:00",
+      "status": "POSTED",
+      "debit_account": "WF-VOSTRO-SBI-USD-001",
+      "credit_account": "WFBIUS6S",
+      "amount": 10000.0,
+      "currency": "USD"
+    },
+    "E2E-TEST-f525fed5": {
+      "timestamp": "2025-12-23T01:25:46.665702+00:00",
+      "status": "POSTED",
+      "debit_account": "WF-VOSTRO-SBI-USD-001",
+      "credit_account": "WFBIUS6S",
+      "amount": 5000.0,
+      "currency": "USD"
+    },
+    "E2E-R1-INTERNAL-001": {
+      "timestamp": "2025-12-23T04:50:12.855115+00:00",
+      "status": "POSTED",
+      "debit_account": "SBININBB",
+      "credit_account": "WFBIUS6S",
+      "amount": 5000.0,
+      "currency": "USD"
+    },
+    "E2E-R2-INTERMEDIARY-001": {
+      "timestamp": "2025-12-23T04:50:12.864248+00:00",
+      "status": "POSTED",
+      "debit_account": "SBININBB",
+      "credit_account": "CHASUS33",
+      "amount": 9999.0,
+      "currency": "USD"
+    },
+    "E2E-R3-CHIPS-001": {
+      "timestamp": "2025-12-23T04:50:12.884541+00:00",
+      "status": "POSTED",
+      "debit_account": "CHASUS33",
+      "credit_account": "WF-CHIPS-NOSTRO-DEUT-001",
+      "amount": 8000.0,
+      "currency": "USD"
+    },
+    "E2E-R4-FED-001": {
+      "timestamp": "2025-12-23T04:50:12.899185+00:00",
+      "status": "POSTED",
+      "debit_account": "CHASUS33",
+      "credit_account": "USBKUS44",
+      "amount": 8000.0,
+      "currency": "USD"
+    },
+    "E2E-R5-OPTIMIZATION-001": {
+      "timestamp": "2025-12-23T04:50:12.909783+00:00",
+      "status": "POSTED",
+      "debit_account": "BOFAUS3N",
+      "credit_account": "CHASUS33",
+      "amount": 9000.0,
+      "currency": "USD"
+    },
+    "E2E-R6-SWIFT-001": {
+      "timestamp": "2025-12-23T04:50:12.922646+00:00",
+      "status": "POSTED",
+      "debit_account": "CHASUS33",
+      "credit_account": "BAMXMXMM",
+      "amount": 7500.0,
+      "currency": "USD"
+    }
+  },
+  "metadata": {
+    "created_at": "2025-12-23T01:22:28.121730+00:00",
+    "version": "1.0"
+  }
+}

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <FIToFICstmrCdtTrf>
+
+    <!-- Group Header -->
+    <GrpHdr>
+      <MsgId>R4-FED-001</MsgId>
+      <CreDtTm>2025-12-25T10:15:00Z</CreDtTm>
+      <NbOfTxs>1</NbOfTxs>
+      <SttlmInf>
+        <SttlmMtd>CLRG</SttlmMtd>
+      </SttlmInf>
+    </GrpHdr>
+
+    <!-- Credit Transfer Transaction -->
+    <CdtTrfTxInf>
+
+      <!-- Payment Identification -->
+      <PmtId>
+        <EndToEndId>E2E-R4-FED-001</EndToEndId>
+      </PmtId>
+
+      <!-- Settlement Amount -->
+      <IntrBkSttlmAmt Ccy="USD">8000.00</IntrBkSttlmAmt>
+      <IntrBkSttlmDt>2025-12-25</IntrBkSttlmDt>
+
+      <!-- Debtor Agent (US Bank) -->
+      <DbtrAgt>
+        <FinInstnId>
+          <BICFI>CHASUS33XXX</BICFI>
+        </FinInstnId>
+      </DbtrAgt>
+
+      <!-- Creditor Agent (US Bank with FED only - no CHIPS nostro) -->
+      <CdtrAgt>
+        <FinInstnId>
+          <BICFI>USBKUS44XXX</BICFI>
+        </FinInstnId>
+      </CdtrAgt>
+
+      <!-- Creditor -->
+      <Cdtr>
+        <Nm>US Bank Customer</Nm>
+      </Cdtr>
+
+      <!-- Charges -->
+      <ChrgBr>SHAR</ChrgBr>
+
+    </CdtTrfTxInf>
+
+  </FIToFICstmrCdtTrf>
+
+</Document>
+

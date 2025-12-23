@@ -83,7 +83,7 @@ class PaymentOrchestrator:
         self._publish_to_step(topics.TOPIC_ACCOUNT_VALIDATION_IN, event)
         return event
 
-    def _emit_final_once(self, snapshot: PaymentStateSnapshot) -> None:
+    def _emit_final_once(self, snapshot: PaymentStateSnapshot, event: Optional[PaymentEvent] = None) -> None:
         e2e = snapshot.end_to_end_id
         if snapshot.state != PaymentProcessingState.POSTED:
             return
@@ -91,11 +91,21 @@ class PaymentOrchestrator:
             if e2e in self._final_emitted:
                 return
             self._final_emitted.add(e2e)
+            # Get PaymentEvent from cache if not provided
+            if event is None:
+                event = self._events.get(e2e)
 
-        payload = payment_state_snapshot_to_json_bytes(snapshot)
-        key = self._key_fn(snapshot) if self._key_fn else e2e
-        print(f"[Orchestrator] Emitting FINAL state for E2E={e2e}, state={snapshot.state.value}")
-        self._producer.send_bytes(self._final_topic, key, payload)
+        # Publish PaymentEvent to final topic for egress service
+        # The egress service needs the full PaymentEvent to generate network messages
+        if event:
+            print(f"[Orchestrator] Emitting FINAL PaymentEvent for E2E={e2e}, state={snapshot.state.value}")
+            self._producer.send(self._final_topic, e2e, event)
+        else:
+            # Fallback: publish snapshot if event not available
+            payload = payment_state_snapshot_to_json_bytes(snapshot)
+            key = self._key_fn(snapshot) if self._key_fn else e2e
+            print(f"[Orchestrator] Emitting FINAL state (no event) for E2E={e2e}, state={snapshot.state.value}")
+            self._producer.send_bytes(self._final_topic, key, payload)
 
     def _handle_service_result(self, result: ServiceResult) -> Any:
         snapshot = self._sm.ingest_service_result(result)
@@ -138,7 +148,7 @@ class PaymentOrchestrator:
         elif svc == "balance_check":
             self._publish_to_step(topics.TOPIC_PAYMENT_POSTING_IN, event)
         elif svc == "payment_posting":
-            self._emit_final_once(snapshot)
+            self._emit_final_once(snapshot, event)
 
         return snapshot
 

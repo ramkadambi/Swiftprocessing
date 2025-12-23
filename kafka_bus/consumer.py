@@ -11,9 +11,11 @@ from canonical import (
     CreditorType,
     PaymentEvent,
     PaymentStatus,
+    RoutingDecision,
     RoutingNetwork,
     ServiceResult,
     ServiceResultStatus,
+    Urgency,
 )
 
 
@@ -101,6 +103,59 @@ def payment_event_from_json(value: Union[bytes, str]) -> PaymentEvent:
 
     routing_rule_applied = data.get("routing_rule_applied")
 
+    # Handle optional routing_decision
+    routing_decision = None
+    rd_data = data.get("routing_decision")
+    if rd_data and isinstance(rd_data, dict):
+        try:
+            rd_selected_network = RoutingNetwork(str(rd_data.get("selected_network", "")))
+            rd_sender_bank = _agent_from(rd_data.get("sender_bank", {}))
+            rd_creditor_bank = _agent_from(rd_data.get("creditor_bank", {}))
+            rd_intermediary_bank = None
+            if rd_data.get("intermediary_bank"):
+                rd_intermediary_bank = _agent_from(rd_data["intermediary_bank"])
+            
+            rd_urgency = Urgency(str(rd_data.get("urgency", "NORMAL")))
+            rd_customer_preference = None
+            if rd_data.get("customer_preference"):
+                rd_customer_preference = RoutingNetwork(str(rd_data["customer_preference"]))
+            
+            rd_rule_applied = rd_data.get("routing_rule_applied")
+            rd_bic_lookup = rd_data.get("bic_lookup_data")
+            
+            rd_av_data = rd_data.get("account_validation_data")
+            rd_account_validation = None
+            if rd_av_data and isinstance(rd_av_data, dict):
+                try:
+                    rd_av_status = ServiceResultStatus(str(rd_av_data.get("status", "")))
+                    rd_av_creditor_type = CreditorType(str(rd_av_data.get("creditor_type", "")))
+                    rd_account_validation = AccountValidationEnrichment(
+                        status=rd_av_status,
+                        creditor_type=rd_av_creditor_type,
+                        fed_member=bool(rd_av_data.get("fed_member", False)),
+                        chips_member=bool(rd_av_data.get("chips_member", False)),
+                        nostro_with_us=bool(rd_av_data.get("nostro_with_us", False)),
+                        vostro_with_us=bool(rd_av_data.get("vostro_with_us", False)),
+                        preferred_correspondent=rd_av_data.get("preferred_correspondent"),
+                    )
+                except Exception:
+                    rd_account_validation = None
+            
+            routing_decision = RoutingDecision(
+                selected_network=rd_selected_network,
+                sender_bank=rd_sender_bank,
+                creditor_bank=rd_creditor_bank,
+                intermediary_bank=rd_intermediary_bank,
+                urgency=rd_urgency,
+                customer_preference=rd_customer_preference,
+                routing_rule_applied=rd_rule_applied,
+                bic_lookup_data=rd_bic_lookup,
+                account_validation_data=rd_account_validation,
+            )
+        except Exception:
+            # If routing_decision data is malformed, ignore it (optional field)
+            routing_decision = None
+
     return PaymentEvent(
         msg_id=str(data["msg_id"]),
         end_to_end_id=str(data["end_to_end_id"]),
@@ -113,6 +168,7 @@ def payment_event_from_json(value: Union[bytes, str]) -> PaymentEvent:
         selected_network=selected_network,
         agent_chain=agent_chain,
         routing_rule_applied=routing_rule_applied,
+        routing_decision=routing_decision,
     )
 
 

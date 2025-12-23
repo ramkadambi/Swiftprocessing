@@ -51,9 +51,19 @@ class RoutingNetwork(str, Enum):
     Selected payment routing network.
     """
 
+    INTERNAL = "INTERNAL"
     FED = "FED"
     CHIPS = "CHIPS"
     SWIFT = "SWIFT"
+
+
+class Urgency(str, Enum):
+    """
+    Payment urgency level.
+    """
+
+    NORMAL = "NORMAL"
+    HIGH = "HIGH"
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +126,7 @@ class PaymentEvent:
     selected_network: Optional[RoutingNetwork] = None
     agent_chain: Optional[list[Agent]] = None
     routing_rule_applied: Optional[str] = None
+    routing_decision: Optional[RoutingDecision] = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.msg_id, str) or not self.msg_id.strip():
@@ -157,6 +168,39 @@ class PaymentEvent:
             for agent in self.agent_chain:
                 if not isinstance(agent, Agent):
                     raise TypeError("agent_chain must contain only Agent instances.")
+
+
+@dataclass(frozen=True, slots=True)
+class RoutingDecision:
+    """
+    Routing decision object containing all routing-related information.
+    
+    Based on business_analysis.md canonical routing structure.
+    This object is created by the routing validation satellite and contains
+    the complete routing context and decisions.
+    """
+
+    selected_network: RoutingNetwork
+    sender_bank: Agent
+    creditor_bank: Agent
+    intermediary_bank: Optional[Agent] = None
+    urgency: Urgency = Urgency.NORMAL
+    customer_preference: Optional[RoutingNetwork] = None
+    routing_rule_applied: Optional[str] = None
+    bic_lookup_data: Optional[dict] = None  # BIC lookup enrichment
+    account_validation_data: Optional[AccountValidationEnrichment] = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.selected_network, RoutingNetwork):
+            raise TypeError("selected_network must be a RoutingNetwork.")
+        if not isinstance(self.sender_bank, Agent):
+            raise TypeError("sender_bank must be an Agent.")
+        if not isinstance(self.creditor_bank, Agent):
+            raise TypeError("creditor_bank must be an Agent.")
+        if self.intermediary_bank is not None and not isinstance(self.intermediary_bank, Agent):
+            raise TypeError("intermediary_bank must be an Agent or None.")
+        if not isinstance(self.urgency, Urgency):
+            raise TypeError("urgency must be an Urgency.")
 
 
 @dataclass(frozen=True, slots=True)
