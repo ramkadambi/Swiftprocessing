@@ -1,0 +1,260 @@
+{
+    "bank_context": {
+      "bank_name": "Wells Fargo Bank NA",
+      "bank_bic": "WFBIUS6SXXX",
+      "country": "US"
+    },
+  
+    "external_services": {
+      "bic_directory": "BankersAlmanacOrEquivalent",
+      "payment_ecosystem_api": "WellsPaymentEcosystem"
+    },
+  
+    "rules": [
+      {
+        "rule_id": "WF-PACS008-R1-INTERNAL-CREDIT",
+        "priority": 1,
+        "description": "If both debtor and creditor agents are Wells Fargo in customer-initiated payment (pacs.008), route internally (IBT)",
+  
+        "conditions": {
+          "pacs.008.debtor_agent_bic": "WFBIUS6SXXX",
+          "pacs.008.creditor_agent_bic": "WFBIUS6SXXX"
+        },
+  
+        "actions": {
+          "routing_type": "IBT",
+          "selected_network": "INTERNAL",
+          "next_hop": "NONE",
+          "message_type": "pacs.008"
+        }
+      },
+
+      {
+        "rule_id": "WF-PACS009-R1-INTERNAL-CREDIT",
+        "priority": 1,
+        "description": "If both debtor and creditor agents are Wells Fargo in financial institution-initiated payment (pacs.009), route internally (IBT)",
+  
+        "conditions": {
+          "pacs.009.debtor_agent_bic": "WFBIUS6SXXX",
+          "pacs.009.creditor_agent_bic": "WFBIUS6SXXX"
+        },
+  
+        "actions": {
+          "routing_type": "IBT",
+          "selected_network": "INTERNAL",
+          "next_hop": "NONE",
+          "message_type": "pacs.009"
+        }
+      },
+  
+      {
+        "rule_id": "WF-PACS008-R2-US-INTERMEDIARY-LOOKUP",
+        "priority": 2,
+        "description": "Wells customer initiates payment to US creditor; lookup receiving bank clearing capabilities (FED/CHIPS)",
+  
+        "conditions": {
+          "pacs.008.debtor_agent_bic": "WFBIUS6SXXX",
+          "ultimate_creditor_country": "US"
+        },
+  
+        "actions": {
+          "invoke_services": [
+            "BIC_TO_ABA_LOOKUP",
+            "BIC_TO_CHIPS_LOOKUP"
+          ],
+          "message_type": "pacs.008"
+        }
+      },
+
+      {
+        "rule_id": "WF-PACS009-R2-US-INTERMEDIARY-LOOKUP",
+        "priority": 2,
+        "description": "Wells is intermediary in bank-initiated payment (pacs.009); lookup next US bank clearing capabilities (FED/CHIPS)",
+  
+        "conditions": {
+          "pacs.009.debtor_agent_bic": "WFBIUS6SXXX",
+          "ultimate_creditor_country": "US"
+        },
+  
+        "actions": {
+          "invoke_services": [
+            "BIC_TO_ABA_LOOKUP",
+            "BIC_TO_CHIPS_LOOKUP"
+          ],
+          "message_type": "pacs.009"
+        }
+      },
+  
+      {
+        "rule_id": "WF-PACS008-R3-CHIPS-DEFAULT",
+        "priority": 3,
+        "description": "Route via CHIPS when CHIPS ID is available (default, cheaper option) - customer-initiated payment (pacs.008)",
+  
+        "conditions": {
+          "next_bank.chips_id_exists": true,
+          "next_bank.aba_exists": false
+        },
+  
+        "actions": {
+          "routing_type": "INTERMEDIARY",
+          "selected_network": "CHIPS",
+          "message_type": "pacs.008"
+        }
+      },
+
+      {
+        "rule_id": "WF-PACS009-R3-CHIPS-DEFAULT",
+        "priority": 3,
+        "description": "Route via CHIPS when CHIPS ID is available (default, cheaper option) - bank-initiated only (pacs.009)",
+  
+        "conditions": {
+          "next_bank.chips_id_exists": true,
+          "next_bank.aba_exists": false
+        },
+  
+        "actions": {
+          "routing_type": "INTERMEDIARY",
+          "selected_network": "CHIPS",
+          "message_type": "pacs.009"
+        }
+      },
+  
+      {
+        "rule_id": "WF-PACS008-R4-FED-ONLY",
+        "priority": 4,
+        "description": "Route via FED when only ABA is available - customer-initiated payment (pacs.008)",
+  
+        "conditions": {
+          "next_bank.chips_id_exists": false,
+          "next_bank.aba_exists": true
+        },
+  
+        "actions": {
+          "routing_type": "INTERMEDIARY",
+          "selected_network": "FED",
+          "message_type": "pacs.008"
+        }
+      },
+
+      {
+        "rule_id": "WF-PACS009-R4-FED-ONLY",
+        "priority": 4,
+        "description": "Route via FED when only ABA is available - bank-initiated only (pacs.009)",
+  
+        "conditions": {
+          "next_bank.chips_id_exists": false,
+          "next_bank.aba_exists": true
+        },
+  
+        "actions": {
+          "routing_type": "INTERMEDIARY",
+          "selected_network": "FED",
+          "message_type": "pacs.009"
+        }
+      },
+  
+      {
+        "rule_id": "WF-PACS008-R5-CHIPS-OR-FED-OPTIMIZATION",
+        "priority": 5,
+        "description": "When both CHIPS and FED are available for customer-initiated payment, apply Wells operational optimization. Check customer preference first, then CHIPS cutoff+urgency, else default to CHIPS",
+  
+        "conditions": {
+          "next_bank.chips_id_exists": true,
+          "next_bank.aba_exists": true
+        },
+  
+        "decision_matrix": {
+          "if": [
+            {
+              "condition": "customer_preference == FED",
+              "route": "FED"
+            },
+            {
+              "condition": "payment_ecosystem.chips_cutoff_passed == true AND payment_urgency == HIGH",
+              "route": "FED"
+            },
+            {
+              "condition": "payment_ecosystem.chips_queue_depth == HIGH",
+              "route": "FED"
+            }
+          ],
+          "else": {
+            "route": "CHIPS"
+          }
+        },
+  
+        "actions": {
+          "routing_type": "INTERMEDIARY",
+          "message_type": "pacs.008"
+        }
+      },
+
+      {
+        "rule_id": "WF-PACS009-R5-CHIPS-OR-FED-OPTIMIZATION",
+        "priority": 5,
+        "description": "When both CHIPS and FED are available, apply Wells operational optimization. Check customer preference first, then CHIPS cutoff+urgency, else default to CHIPS",
+  
+        "conditions": {
+          "next_bank.chips_id_exists": true,
+          "next_bank.aba_exists": true
+        },
+  
+        "decision_matrix": {
+          "if": [
+            {
+              "condition": "customer_preference == FED",
+              "route": "FED"
+            },
+            {
+              "condition": "payment_ecosystem.chips_cutoff_passed == true AND payment_urgency == HIGH",
+              "route": "FED"
+            },
+            {
+              "condition": "payment_ecosystem.chips_queue_depth == HIGH",
+              "route": "FED"
+            }
+          ],
+          "else": {
+            "route": "CHIPS"
+          }
+        },
+  
+        "actions": {
+          "routing_type": "INTERMEDIARY",
+          "message_type": "pacs.009"
+        }
+      },
+  
+      {
+        "rule_id": "WF-PACS008-R6-CROSSBORDER-OUT-SWIFT",
+        "priority": 10,
+        "description": "If ultimate creditor is outside US in customer-initiated payment (pacs.008), forward payment via SWIFT",
+  
+        "conditions": {
+          "ultimate_creditor_country_not": "US"
+        },
+  
+        "actions": {
+          "routing_type": "INTERMEDIARY",
+          "selected_network": "SWIFT",
+          "message_type": "pacs.008"
+        }
+      },
+
+      {
+        "rule_id": "WF-PACS009-R6-CROSSBORDER-OUT-SWIFT",
+        "priority": 10,
+        "description": "If ultimate creditor is outside US in financial institution-initiated payment (pacs.009), forward payment via SWIFT",
+  
+        "conditions": {
+          "ultimate_creditor_country_not": "US"
+        },
+  
+        "actions": {
+          "routing_type": "INTERMEDIARY",
+          "selected_network": "SWIFT",
+          "message_type": "pacs.009"
+        }
+      }
+    ]
+  }

@@ -53,6 +53,33 @@ def _payment_event_to_wire_dict(event: PaymentEvent) -> dict[str, Any]:
         # agent_chain is already a list of dicts from asdict(), no conversion needed
         pass
 
+    # Handle optional routing_decision
+    routing_decision = d.get("routing_decision")
+    if routing_decision is not None:
+        if isinstance(routing_decision, dict):
+            # Convert enums in routing_decision
+            rd_selected_network = routing_decision.get("selected_network")
+            if rd_selected_network and hasattr(rd_selected_network, "value"):
+                routing_decision["selected_network"] = rd_selected_network.value
+            
+            rd_urgency = routing_decision.get("urgency")
+            if rd_urgency and hasattr(rd_urgency, "value"):
+                routing_decision["urgency"] = rd_urgency.value
+            
+            rd_customer_preference = routing_decision.get("customer_preference")
+            if rd_customer_preference and hasattr(rd_customer_preference, "value"):
+                routing_decision["customer_preference"] = rd_customer_preference.value
+            
+            # Handle account_validation_data in routing_decision
+            rd_av = routing_decision.get("account_validation_data")
+            if rd_av is not None and isinstance(rd_av, dict):
+                rd_av_status = rd_av.get("status")
+                if rd_av_status and hasattr(rd_av_status, "value"):
+                    rd_av["status"] = rd_av_status.value
+                rd_av_creditor_type = rd_av.get("creditor_type")
+                if rd_av_creditor_type and hasattr(rd_av_creditor_type, "value"):
+                    rd_av["creditor_type"] = rd_av_creditor_type.value
+
     return d
 
 
