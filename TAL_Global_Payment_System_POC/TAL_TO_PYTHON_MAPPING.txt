@@ -1,0 +1,35 @@
+TAL → PYTHON SEMANTIC MAPPING
+
+1. TRANSFER-REQ / TRANSFER-RESP
+   → canonical.PaymentEvent
+   → Final JSON emitted to payments.final topic
+
+2. VALIDATE-ACCOUNT
+   → account_validation.py
+   → AccountValidationService.simulate_account_validation
+
+3. SANCTIONS-CHECK
+   → sanctions_check.py
+   → simulate_sanctions_check
+
+4. CHECK-FUNDS
+   → balance_check.py
+   → simulate_balance_check
+
+5. POST-PAYMENT
+   → payment_posting.py
+   → simulate_payment_posting
+
+6. PROCESS-INCOMING-PAYMENT
+   → orchestrator.PaymentOrchestrator
+   → Kafka-driven Saga Orchestration
+
+7. TAL IPC
+   → Kafka Topics (topics.py)
+
+8. TAL Transaction Context
+   → PaymentStateMachine / PaymentStateSnapshot
+
+Key Principle:
+TAL procedures are converted as independent, stateless services.
+The orchestrator replaces implicit TAL control flow with explicit saga sequencing.
